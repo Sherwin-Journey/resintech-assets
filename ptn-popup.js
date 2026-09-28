@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  var PTN_DEFAULT_ON = false; // flip to true at go-live
+  var PTN_DEFAULT_ON = true; // flip to true at go-live
   var SHOW_FILTERS = false;   // Related Filters is empty in the CMS for now
   var VISIBLE_PILLS = 5;      // pills shown before "View all"
 
