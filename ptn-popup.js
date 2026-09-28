@@ -6,6 +6,7 @@
  *   - Left/middle cards: filled from window.PTDATA (exposed by periodic-table.min.js).
  *   - Products card: built from the hidden CMS Collection List inside #pt-popup
  *     (Test Contaminants Lists Copy → Related Products), grouped by Product Category.
+ *   - Table tiles: "RT" badges are recalculated from the same CMS data.
  *
  * SAFE ROLLOUT: only active when the URL has ?ptn=1 (or localStorage "ptn" = "1").
  * Everyone else keeps the old popup. Set PTN_DEFAULT_ON = true to go live.
@@ -261,6 +262,54 @@
     card.style.display = total ? "" : "none";
   }
 
+  // ---------- "RT" badges on the table tiles ----------   // NEW
+  // The old script draws badges from its hardcoded list; replace them with CMS counts.
+  // The grid is re-rendered (innerHTML) whenever a filter changes, so re-apply on each redraw.
+  var badgeCounts = null;
+
+  function countsFromCms() {
+    var counts = {};
+    window.PTDATA.elements.forEach(function (e) {
+      var g = collectProducts(overlay, e.symbol, e.name), n = 0;
+      Object.keys(g).forEach(function (k) { n += g[k].length; });
+      if (n) counts[e.atomicNumber] = n;
+    });
+    return counts;
+  }
+
+  function syncBadges(grid) {
+    if (!badgeCounts) badgeCounts = countsFromCms();
+    Array.prototype.forEach.call(grid.querySelectorAll(".cell[data-atomic]"), function (cell) {
+      var n = badgeCounts[cell.getAttribute("data-atomic")];
+      var badge = $(cell, ".rt-badge");
+      if (!n) { if (badge) badge.remove(); return; }
+      if (!badge) {
+        badge = el("div", "rt-badge", "RT");
+        cell.appendChild(badge);
+      }
+      badge.title = "ResinTech: " + n + " products - click for details";
+    });
+  }
+
+  function watchGrid() {
+    var grid = document.getElementById("periodic-grid");
+    if (!grid) return;
+    var pending = false;
+    var observer = new MutationObserver(function () {
+      if (pending) return;
+      pending = true;
+      // Wait for the redraw to finish; our own edits then trigger at most one no-op pass.
+      requestAnimationFrame(function () {
+        observer.disconnect();
+        syncBadges(grid);
+        observer.observe(grid, { childList: true });
+        pending = false;
+      });
+    });
+    syncBadges(grid);
+    observer.observe(grid, { childList: true });
+  }
+
   // ---------- open / close ----------
   var overlay, lastFocus;
 
@@ -312,6 +361,7 @@
     }
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+    try { watchGrid(); } catch (err) { if (window.console) console.error("PTN badges:", err); } // NEW
     return true;
   }
 
